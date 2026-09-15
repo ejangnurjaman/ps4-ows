@@ -1,0 +1,8 @@
+PS4 OWS (Offline Webkit Server) is a lightweight application that turns your Android device into a local HTTP server. It allows users to host their own web-based toolkits (provided via ZIP) locally, eliminating the need for an internet connection.
+
+Features:
+* Local HTTP Server using NanoHTTPD.
+* Completely offline: works via Hotspot or local Wi-Fi.
+* Toolkit support: Load your own files via ZIP.
+* Real-time IP and status monitoring.
+* No trackers, no ads, no analytics.
