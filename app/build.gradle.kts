@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.truecarbide.ps4ows"
-    compileSdk = 37
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.truecarbide.ps4ows"
         minSdk = 24
-        targetSdk = 37
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0-beta"
 
