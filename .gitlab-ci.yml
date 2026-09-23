@@ -26,8 +26,8 @@ build_apk:
     - unzip -q commandlinetools-linux-${ANDROID_SDK_TOOLS}.zip -d ${ANDROID_HOME}/cmdline-tools
     - mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
     - export PATH=$PATH:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
-    - sdkmanager --update
-    - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "platform-tools"
+    - sdkmanager --channel=3 --update
+    - sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "platform-tools"
 
   script:
     - chmod +x ./gradlew
