@@ -1,68 +1,67 @@
-stages:
-  - build
-  - release
-
-variables:
-  ANDROID_COMPILE_SDK: "37"
-  ANDROID_BUILD_TOOLS: "35.0.0"
-  ANDROID_SDK_TOOLS: "11076708_latest"
-
-build_apk:
-  stage: build
-  image: eclipse-temurin:21-jdk
-
-  rules:
-    - if: $CI_COMMIT_TAG
-
-  before_script:
-    - apt-get --quiet update --yes
-    - apt-get --quiet install --yes wget tar unzip lib32stdc++6 lib32z1
-    - export ANDROID_HOME=${CI_PROJECT_DIR}/android-sdk-root
-    - mkdir -p ${ANDROID_HOME}/licenses
-    - echo "24333f8a63b6825ea9c5514f83c2885b00ad174c" > ${ANDROID_HOME}/licenses/android-sdk-license
-    - echo "84831b9409646a918e30573bab4c9c91346d8abd" > ${ANDROID_HOME}/licenses/android-sdk-preview-license
-    - mkdir -p ${ANDROID_HOME}/cmdline-tools
-    - wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}.zip
-    - unzip -q commandlinetools-linux-${ANDROID_SDK_TOOLS}.zip -d ${ANDROID_HOME}/cmdline-tools
-    - mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
-    - export PATH=$PATH:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
-    - sdkmanager --channel=3 --update
-    - sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "platform-tools"
-
-  script:
-    - chmod +x ./gradlew
-    - ./gradlew assembleRelease
-
-  artifacts:
-    name: "PS4-OWS-$CI_COMMIT_TAG"
-    paths:
-      - app/build/outputs/apk/release/app-release.apk
-    expire_in: 30 days
-
-release:
-  stage: release
-  image: registry.gitlab.com/gitlab-org/cli:latest
-
-  rules:
-    - if: $CI_COMMIT_TAG
+  stages:
+    - build
+    - release
 
   variables:
-    GLAB_ENABLE_CI_AUTOLOGIN: "true"
+    GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
 
-  needs:
-    - job: build_apk
-      artifacts: true
+  cache:
+    key: "ps4-ows-gradle"
+    paths:
+      - .gradle/caches/
+      - .gradle/wrapper/
 
-  script:
-    - |
-      glab release create "$CI_COMMIT_TAG" \
-        --name "PS4 OWS $CI_COMMIT_TAG" \
-        --notes "PS4 OWS Android Release $CI_COMMIT_TAG" \
-        --assets-links='[
-          {
-            "name": "app-release.apk",
-            "url": "'${CI_PROJECT_URL}'/-/jobs/'${CI_JOB_ID}'/artifacts/file/app/build/outputs/apk/release/app-release.apk",
-            "link_type": "package",
-            "direct_asset_path": "/app-release.apk"
-          }
-        ]'
+  # ============================================================
+  # BUILD APK
+  # ============================================================
+
+  build_apk:
+    stage: build
+
+    # JDK 17 digunakan untuk menjalankan Gradle/Android Gradle Plugin.
+    # Target Java aplikasi tetap JVM 11 sesuai app/build.gradle.kts.
+    image: eclipse-temurin:17-jdk
+
+    rules:
+      - if: '$CI_COMMIT_TAG'
+
+    before_script:
+      - chmod +x ./gradlew
+      - java -version
+      - ./gradlew --version
+
+    script:
+      - ./gradlew clean assembleRelease --no-daemon
+
+    artifacts:
+      name: "PS4-OWS-$CI_COMMIT_TAG"
+      paths:
+        - app/build/outputs/apk/release/app-release.apk
+      expire_in: 7 days
+
+  # ============================================================
+  # CREATE GITLAB RELEASE
+  # ============================================================
+
+  create_release:
+    stage: release
+
+    image: registry.gitlab.com/gitlab-org/cli:latest
+
+    rules:
+      - if: '$CI_COMMIT_TAG'
+
+    needs:
+      - job: build_apk
+        artifacts: true
+
+    variables:
+      GLAB_ENABLE_CI_AUTOLOGIN: "true"
+
+    script:
+      - |
+        glab release create "$CI_COMMIT_TAG" \
+          --name "PS4 OWS $CI_COMMIT_TAG" \
+          --notes "PS4 OWS Android Release $CI_COMMIT_TAG" \
+          --ref "$CI_COMMIT_SHA" \
+          "app/build/outputs/apk/release/app-release.apk#app-release.apk#package"
