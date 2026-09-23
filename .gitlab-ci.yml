@@ -1,67 +1,73 @@
-  stages:
-    - build
-    - release
+stages:
+  - build
+  - release
+
+variables:
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+
+cache:
+  key: "ps4-ows-gradle"
+  paths:
+    - .gradle/caches/
+    - .gradle/wrapper/
+
+# ============================================================
+# BUILD APK
+# ============================================================
+
+build_apk:
+  stage: build
+
+  # Android SDK 37 + JDK 17
+  image: saschpe/android-sdk:37-jdk17.0.20_8
+
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+  before_script:
+    - java -version
+    - ./gradlew --version
+    - chmod +x ./gradlew
+
+  script:
+    - ./gradlew clean assembleRelease --no-daemon
+
+  artifacts:
+    name: "PS4-OWS-$CI_COMMIT_TAG"
+    paths:
+      - app/build/outputs/apk/release/app-release.apk
+    expire_in: 7 days
+
+# ============================================================
+# CREATE GITLAB RELEASE
+# ============================================================
+
+create_release:
+  stage: release
+
+  image: registry.gitlab.com/gitlab-org/cli:latest
+
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+  needs:
+    - job: build_apk
+      artifacts: true
 
   variables:
-    GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+    GLAB_ENABLE_CI_AUTOLOGIN: "true"
 
-  cache:
-    key: "ps4-ows-gradle"
-    paths:
-      - .gradle/caches/
-      - .gradle/wrapper/
-
-  # ============================================================
-  # BUILD APK
-  # ============================================================
-
-  build_apk:
-    stage: build
-
-    # JDK 17 digunakan untuk menjalankan Gradle/Android Gradle Plugin.
-    # Target Java aplikasi tetap JVM 11 sesuai app/build.gradle.kts.
-    image: eclipse-temurin:17-jdk
-
-    rules:
-      - if: '$CI_COMMIT_TAG'
-
-    before_script:
-      - chmod +x ./gradlew
-      - java -version
-      - ./gradlew --version
-
-    script:
-      - ./gradlew clean assembleRelease --no-daemon
-
-    artifacts:
-      name: "PS4-OWS-$CI_COMMIT_TAG"
-      paths:
-        - app/build/outputs/apk/release/app-release.apk
-      expire_in: 7 days
-
-  # ============================================================
-  # CREATE GITLAB RELEASE
-  # ============================================================
-
-  create_release:
-    stage: release
-
-    image: registry.gitlab.com/gitlab-org/cli:latest
-
-    rules:
-      - if: '$CI_COMMIT_TAG'
-
-    needs:
-      - job: build_apk
-        artifacts: true
-
-    variables:
-      GLAB_ENABLE_CI_AUTOLOGIN: "true"
-
-    script:
-      - |
-        glab release create "$CI_COMMIT_TAG" \
-          --name "PS4 OWS $CI_COMMIT_TAG" \
-          --notes "PS4 OWS Android Release $CI_COMMIT_TAG" \
-          --ref "$CI_COMMIT_SHA" \
-          "app/build/outputs/apk/release/app-release.apk#app-release.apk#package"
+  script:
+    - |
+      glab release create "$CI_COMMIT_TAG" \
+        --name "PS4 OWS $CI_COMMIT_TAG" \
+        --notes "PS4 OWS Android Release $CI_COMMIT_TAG" \
+        --ref "$CI_COMMIT_SHA" \
+        --assets-links='[
+          {
+            "name": "app-release.apk",
+            "url": "'${CI_PROJECT_URL}'/-/jobs/'${CI_JOB_ID}'/artifacts/raw/app/build/outputs/apk/release/app-release.apk",
+            "link_type": "package",
+            "direct_asset_path": "/app-release.apk"
+          }
+        ]'
