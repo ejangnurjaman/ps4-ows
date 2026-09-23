@@ -1,0 +1,48 @@
+stages:
+  - build
+  - release
+
+build_apk:
+  stage: build
+  image: ghcr.io/cirruslabs/android-sdk:latest
+
+  rules:
+    - if: $CI_COMMIT_TAG
+
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew assembleRelease
+
+  artifacts:
+    name: "PS4-OWS-$CI_COMMIT_TAG"
+    paths:
+      - app/build/outputs/apk/release/app-release.apk
+    expire_in: 30 days
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/cli:latest
+
+  rules:
+    - if: $CI_COMMIT_TAG
+
+  variables:
+    GLAB_ENABLE_CI_AUTOLOGIN: "true"
+
+  needs:
+    - job: build_apk
+      artifacts: true
+
+  script:
+    - |
+      glab release create "$CI_COMMIT_TAG" \
+        --name "PS4 OWS $CI_COMMIT_TAG" \
+        --notes "PS4 OWS Android Release $CI_COMMIT_TAG" \
+        --assets-links='[
+          {
+            "name": "app-release.apk",
+            "url": "'${CI_PROJECT_URL}'/-/jobs/'${CI_JOB_ID}'/artifacts/file/app/build/outputs/apk/release/app-release.apk",
+            "link_type": "package",
+            "direct_asset_path": "/app-release.apk"
+          }
+        ]'
