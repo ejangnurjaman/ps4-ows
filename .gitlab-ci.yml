@@ -5,7 +5,7 @@ stages:
 variables:
   ANDROID_HOME: "$CI_PROJECT_DIR/android-sdk-root"
   ANDROID_COMPILE_SDK: "37"
-  ANDROID_BUILD_TOOLS: "35.0.0"
+  ANDROID_BUILD_TOOLS: "37.0.0"
   ANDROID_SDK_TOOLS: "11076708_latest"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
 
@@ -33,6 +33,7 @@ build_apk:
     - unzip -q commandlinetools-linux-${ANDROID_SDK_TOOLS}.zip -d ${ANDROID_HOME}/cmdline-tools
     - mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest
     - export PATH=$PATH:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
+    - sdkmanager --channel=3 --list | grep -i 37 || true
     - sdkmanager --channel=3 --update
     - sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "platform-tools"
 
