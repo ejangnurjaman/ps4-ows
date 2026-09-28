@@ -1,0 +1,5 @@
+Version 2.0.0 update of PS4 OWS:
+- Added Select Method feature (Default Toolkit vs Custom).
+- Default Toolkit supports multiple verified ZIPs (ps4ows.zip, ps4ows.rawgame4.v1.zip, ps4ows.raw13g.v1.zip) with SHA-256 verification.
+- Custom method supports hosting directly from internal storage folder (/sdcard/ps4ows).
+- Improved UI, documentation, and stability.

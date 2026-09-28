@@ -1,4 +1,4 @@
-# PS4 OWS — Offline Webkit Server
+# PS4 OWS — Offline Webkit Server (v1.0.1)
 
 **PS4 OWS** is a lightweight Android application designed to host PS4 files locally from your device. It eliminates the need for an internet connection by turning your Android phone into a local HTTP server that your PS4 can access.
 
@@ -6,7 +6,9 @@
 
 - **Local HTTP Server**: Hosts web files directly from your Android device.
 - **Offline Functionality**: Works without internet data or external Wi-Fi (supports Hotspot mode).
-- **Custom Toolkit Support**: Easily select and serve your own toolkit via ZIP file.
+- **Select Method**: Choose between **Default Toolkit** and **Custom** hosting methods.
+  - **Default Toolkit**: Select and verify official built-in ZIP toolkits (`ps4ows.zip`, `ps4ows.rawgame4.v1.zip`, `ps4ows.raw13g.v1.zip`) with SHA-256 integrity verification.
+  - **Custom Method**: Host web files directly from a custom `ps4ows` folder located in your internal storage (`/sdcard/ps4ows`).
 - **Real-time Monitoring**: Automatically detects and displays your current IP address and server status.
 - **Privacy Focused**: No trackers, no analytics, no ads, and no cloud dependencies.
 
@@ -26,7 +28,12 @@
 
 1. **Prepare Connection**: It is recommended to turn off Mobile Data and external Wi-Fi. 
 2. **Connect**: Enable your Mobile Hotspot and connect your PS4 to it, or ensure both devices are on the same local network.
-3. **Select Toolkit**: Tap the "Select Toolkit" field and pick your [ps4ows.zip](https://www.weebsu.com/p/ps4ows.html) file. This will extract the files needed for the server.
+3. **Select Method & Source**:
+   - **Method 1 (Default Toolkit)**: Select one of the supported official ZIP files. Automatic SHA-256 integrity check will verify the file:
+     - `ps4ows.zip` (Checksum: `3024070420f67d102d886cc9e785e36b70144693e50ca9ddee35c8a6dfdc1185`)
+     - `ps4ows.rawgame4.v1.zip` (Checksum: `5ad8785f53a6f565fd70c14a0791cc34fdf7798e1633ae7b2a8b520740701c15`)
+     - `ps4ows.raw13g.v1.zip` (Checksum: `7b000d912db10ed2cd638c30a9ac794a2d0e87394090396a1305c67e1c8fc16b`)
+   - **Method 2 (Custom)**: Create a folder named `ps4ows` in your phone's internal storage (`/sdcard/ps4ows`) containing your custom web host files (`index.html`, etc.).
 4. **Start Server**: Tap the **[Start Server]** button.
 5. **Access on PS4**: 
    - Note the URL displayed (e.g., `http://192.168.x.x:8080`).

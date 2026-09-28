@@ -3,7 +3,7 @@ package com.truecarbide.ps4ows
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.ConnectivityManager
@@ -13,17 +13,22 @@ import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.provider.OpenableColumns
+import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.truecarbide.ps4ows.R
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -36,14 +41,24 @@ class MainActivity : AppCompatActivity() {
     private var isServerRunning = false
     private val serverPort = 8080
     private var isToolkitReady = false
+    private var selectedMethod = 0 // 0: Default Toolkit, 1: Custom
 
-    // Official SHA-256 Hash for ps4ows.zip
-    private val OFFICIAL_HASH = "3024070420f67d102d886cc9e785e36b70144693e50ca9ddee35c8a6dfdc1185"
+    // Official SHA-256 Hashes
+    private val VALID_HASHES = mapOf(
+        "3024070420f67d102d886cc9e785e36b70144693e50ca9ddee35c8a6dfdc1185" to "ps4ows.zip",
+        "5ad8785f53a6f565fd70c14a0791cc34fdf7798e1633ae7b2a8b520740701c15" to "ps4ows.rawgame4.v1.zip",
+        "7b000d912db10ed2cd638c30a9ac794a2d0e87394090396a1305c67e1c8fc16b" to "ps4ows.raw13g.v1.zip"
+    )
 
     private lateinit var tvPort: TextView
     private lateinit var tvNetworkStatus: TextView
     private lateinit var tvServerUrl: TextView
     private lateinit var tvZipPath: TextView
+    private lateinit var tvCustomPath: TextView
+    private lateinit var tvCustomStatus: TextView
+    private lateinit var radioGroupMethod: RadioGroup
+    private lateinit var layoutDefaultToolkit: LinearLayout
+    private lateinit var layoutCustomMethod: LinearLayout
     private lateinit var btnStartStop: Button
     private lateinit var connectivityManager: ConnectivityManager
 
@@ -51,7 +66,9 @@ class MainActivity : AppCompatActivity() {
         uri?.let { handleSelectedZip(it) }
     }
 
-    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
+    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
+        checkCustomFolderStatus()
+    }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -71,8 +88,15 @@ class MainActivity : AppCompatActivity() {
         tvNetworkStatus = findViewById(R.id.tvNetworkStatus)
         tvServerUrl = findViewById(R.id.tvServerUrl)
         tvZipPath = findViewById(R.id.tvZipPath)
+        tvCustomPath = findViewById(R.id.tvCustomPath)
+        tvCustomStatus = findViewById(R.id.tvCustomStatus)
+        radioGroupMethod = findViewById(R.id.radioGroupMethod)
+        layoutDefaultToolkit = findViewById(R.id.layoutDefaultToolkit)
+        layoutCustomMethod = findViewById(R.id.layoutCustomMethod)
         btnStartStop = findViewById(R.id.btnStartStop)
         connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        setupMethodSelection()
 
         findViewById<LinearLayout>(R.id.llZipPicker).setOnClickListener {
             zipPickerLauncher.launch("application/zip")
@@ -92,11 +116,51 @@ class MainActivity : AppCompatActivity() {
         createNotificationChannel()
     }
 
+    private fun setupMethodSelection() {
+        radioGroupMethod.setOnCheckedChangeListener { _, checkedId ->
+            if (checkedId == R.id.radioDefaultToolkit) {
+                selectedMethod = 0
+                layoutDefaultToolkit.visibility = View.VISIBLE
+                layoutCustomMethod.visibility = View.GONE
+            } else if (checkedId == R.id.radioCustom) {
+                selectedMethod = 1
+                layoutDefaultToolkit.visibility = View.GONE
+                layoutCustomMethod.visibility = View.VISIBLE
+                checkAndRequestStoragePermissions()
+                checkCustomFolderStatus()
+            }
+        }
+    }
+
     private fun checkToolkitStatus() {
         val toolkitDir = File(filesDir, "toolkit")
         isToolkitReady = toolkitDir.exists() && toolkitDir.isDirectory && (toolkitDir.list()?.isNotEmpty() ?: false)
         if (isToolkitReady) {
             tvZipPath.text = "Toolkit is ready"
+        }
+    }
+
+    private fun checkCustomFolderStatus() {
+        val customDir = File(Environment.getExternalStorageDirectory(), "ps4ows")
+        tvCustomPath.text = "Path: ${customDir.absolutePath}"
+        if (customDir.exists() && customDir.isDirectory) {
+            val files = customDir.list()
+            if (files != null && files.isNotEmpty()) {
+                val hasIndex = files.any { it.equals("index.html", ignoreCase = true) }
+                if (hasIndex) {
+                    tvCustomStatus.text = "Status: Ready (${files.size} items, index.html found)"
+                    tvCustomStatus.setTextColor(Color.parseColor("#00FF00"))
+                } else {
+                    tvCustomStatus.text = "Status: Warning - index.html not found in folder"
+                    tvCustomStatus.setTextColor(Color.parseColor("#FFE082"))
+                }
+            } else {
+                tvCustomStatus.text = "Status: Folder is empty"
+                tvCustomStatus.setTextColor(Color.parseColor("#FF5252"))
+            }
+        } else {
+            tvCustomStatus.text = "Status: Folder not found! Please create 'ps4ows' folder in internal storage."
+            tvCustomStatus.setTextColor(Color.parseColor("#FF5252"))
         }
     }
 
@@ -113,6 +177,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkAndRequestStoragePermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName"))
+                    startActivity(intent)
+                }
+            }
+        } else {
+            val hasRead = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            val hasWrite = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            if (!hasRead || !hasWrite) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE), 100)
+            }
+        }
+    }
+
     private fun registerNetworkCallback() {
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -122,13 +206,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startServer() {
-        if (!isToolkitReady) {
-            showErrorDialog("Please select and extract toolkit ZIP first.")
-            return
+        val rootDir: File
+        if (selectedMethod == 0) {
+            if (!isToolkitReady) {
+                showErrorDialog("Please select and extract a valid default toolkit ZIP first.")
+                return
+            }
+            rootDir = File(filesDir, "toolkit")
+        } else {
+            val customDir = File(Environment.getExternalStorageDirectory(), "ps4ows")
+            if (!customDir.exists() || !customDir.isDirectory) {
+                showErrorDialog("Custom folder 'ps4ows' not found in internal storage (${customDir.absolutePath}). Please create it and add your web host files.")
+                return
+            }
+            rootDir = customDir
         }
 
         try {
-            server = Ps4HttpServer(this, serverPort)
+            server = Ps4HttpServer(rootDir, serverPort)
             server?.start()
             isServerRunning = true
             btnStartStop.text = "Stop Server"
@@ -193,7 +288,8 @@ class MainActivity : AppCompatActivity() {
 
             // 2. Verify SHA-256 Hash
             val fileHash = calculateSHA256(tempFile)
-            if (fileHash != OFFICIAL_HASH) {
+            val matchedToolkitName = VALID_HASHES[fileHash]
+            if (matchedToolkitName == null) {
                 tempFile.delete()
                 showErrorDialog("Verification Failed: Invalid or modified ZIP file detected.\n\nHash: $fileHash")
                 return
@@ -206,8 +302,8 @@ class MainActivity : AppCompatActivity() {
             tempFile.delete()
             
             isToolkitReady = true
-            tvZipPath.text = "Toolkit verified & ready"
-            Toast.makeText(this, "Toolkit Verified Successfully", Toast.LENGTH_SHORT).show()
+            tvZipPath.text = "Verified: $matchedToolkitName"
+            Toast.makeText(this, "Toolkit ($matchedToolkitName) Verified Successfully", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             e.printStackTrace()
             showErrorDialog("Failed to process toolkit: ${e.message}")
@@ -266,7 +362,9 @@ class MainActivity : AppCompatActivity() {
             
             2. Connect: Enable Mobile Hotspot and connect your PS4 to it.
             
-            3. Select Toolkit: Tap "Select Toolkit" and pick your ps4ows.zip file. This will extract the files needed for the server.
+            3. Select Method:
+               • Default Toolkit: Select an official supported ZIP file (ps4ows.zip, ps4ows.rawgame4.v1.zip, or ps4ows.raw13g.v1.zip). SHA-256 verification will run automatically.
+               • Custom: Create a folder named "ps4ows" in your internal storage (/sdcard/ps4ows) and place your web host files (index.html, etc.) inside it.
             
             4. Start Server: Tap the [Start Server] button.
             
@@ -288,7 +386,7 @@ class MainActivity : AppCompatActivity() {
             Created by youtube.com/@truecarbide
             Powered by weebsu.com
             
-            v1.0.0-beta
+            v1.0.1
         """.trimIndent()
 
         AlertDialog.Builder(this)

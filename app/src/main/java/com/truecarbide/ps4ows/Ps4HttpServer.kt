@@ -1,21 +1,17 @@
 package com.truecarbide.ps4ows
 
-import android.content.Context
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
 import java.io.FileInputStream
-import java.io.InputStream
 
-class Ps4HttpServer(private val context: Context, port: Int) : NanoHTTPD(port) {
-
-    private val toolkitDir = File(context.filesDir, "toolkit")
+class Ps4HttpServer(private val rootDir: File, port: Int) : NanoHTTPD(port) {
 
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
         
         // Default to index.html for root
         val relativePath = if (uri == "/" || uri.isEmpty()) "index.html" else uri.removePrefix("/")
-        val file = File(toolkitDir, relativePath)
+        val file = File(rootDir, relativePath)
 
         if (file.exists() && file.isFile) {
             val mimeType = getMimeType(relativePath)
